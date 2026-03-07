@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Knowledge Base</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #242736;
+      --border: #2e3144;
+      --text: #e4e4e7;
+      --text-dim: #9395a5;
+      --accent: #6366f1;
+      --accent-hover: #818cf8;
+      --danger: #ef4444;
+      --success: #22c55e;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+    }
+
+    /* --- Sidebar --- */
+    .sidebar {
+      width: 280px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .sidebar-header {
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sidebar-header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .nav-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-tab {
+      flex: 1;
+      padding: 12px;
+      text-align: center;
+      font-size: 13px;
+      cursor: pointer;
+      color: var(--text-dim);
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .nav-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    .nav-tab:hover { color: var(--text); }
+
+    .sidebar-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+    }
+
+    /* --- Documents Panel --- */
+    .doc-list { list-style: none; }
+
+    .doc-item {
+      padding: 12px;
+      background: var(--surface2);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .doc-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      margin-bottom: 4px;
+    }
+
+    .doc-name {
+      font-size: 14px;
+      font-weight: 500;
+      word-break: break-word;
+    }
+
+    .doc-meta {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .doc-type {
+      display: inline-block;
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: var(--accent);
+      color: white;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .doc-actions {
+      display: flex;
+      gap: 4px;
+      margin-top: 8px;
+    }
+
+    .doc-actions button {
+      font-size: 11px;
+      padding: 4px 8px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-dim);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .doc-actions button:hover {
+      color: var(--text);
+      border-color: var(--text-dim);
+    }
+
+    .doc-actions button.delete:hover {
+      color: var(--danger);
+      border-color: var(--danger);
+    }
+
+    .add-doc-section {
+      border-top: 1px solid var(--border);
+      padding: 16px;
+    }
+
+    .add-doc-section h3 {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .input-group {
+      margin-bottom: 10px;
+    }
+
+    .input-group label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-bottom: 4px;
+    }
+
+    .input-group input,
+    .input-group textarea {
+      width: 100%;
+      padding: 8px 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .input-group input:focus,
+    .input-group textarea:focus {
+      border-color: var(--accent);
+    }
+
+    .input-group textarea {
+      resize: vertical;
+      min-height: 60px;
+      font-family: inherit;
+    }
+
+    .add-type-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 12px;
+    }
+
+    .add-type-tab {
+      flex: 1;
+      padding: 6px;
+      text-align: center;
+      font-size: 12px;
+      cursor: pointer;
+      color: var(--text-dim);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+
+    .add-type-tab.active {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: rgba(99, 102, 241, 0.1);
+    }
+
+    .btn {
+      width: 100%;
+      padding: 10px;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn:hover { background: var(--accent-hover); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .file-drop {
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 10px;
+    }
+
+    .file-drop:hover,
+    .file-drop.dragover {
+      border-color: var(--accent);
+      background: rgba(99, 102, 241, 0.05);
+    }
+
+    .file-drop p {
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+
+    .file-drop .formats {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 6px;
+      opacity: 0.7;
+    }
+
+    .file-input { display: none; }
+
+    /* --- Settings Panel --- */
+    .settings-panel { display: none; }
+    .settings-panel.active { display: block; }
+    .docs-panel { display: none; }
+    .docs-panel.active { display: block; }
+
+    .status-bar {
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .status-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+
+    .status-dot.green { background: var(--success); }
+    .status-dot.red { background: var(--danger); }
+    .status-dot.yellow { background: #eab308; }
+
+    /* --- Chat Area --- */
+    .chat-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chat-header {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+      color: var(--text-dim);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+    }
+
+    .message {
+      margin-bottom: 20px;
+      max-width: 800px;
+    }
+
+    .message.user {
+      margin-left: auto;
+    }
+
+    .message-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+      color: var(--text-dim);
+    }
+
+    .message.user .message-label { text-align: right; }
+
+    .message-bubble {
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 14px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    .message.user .message-bubble {
+      background: var(--accent);
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+
+    .message.assistant .message-bubble {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-bottom-left-radius: 4px;
+    }
+
+    .message.assistant .message-bubble strong {
+      color: var(--accent-hover);
+    }
+
+    .chat-input-area {
+      padding: 16px 24px;
+      border-top: 1px solid var(--border);
+    }
+
+    .chat-input-wrapper {
+      display: flex;
+      gap: 8px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .chat-input {
+      flex: 1;
+      padding: 12px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .chat-input:focus { border-color: var(--accent); }
+
+    .send-btn {
+      padding: 12px 20px;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 0.2s;
+      white-space: nowrap;
+    }
+
+    .send-btn:hover { background: var(--accent-hover); }
+    .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .clear-chat {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .clear-chat:hover {
+      color: var(--text);
+      border-color: var(--text-dim);
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--text-dim);
+      text-align: center;
+      padding: 40px;
+    }
+
+    .empty-state h2 {
+      font-size: 20px;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+
+    .empty-state p {
+      font-size: 14px;
+      max-width: 400px;
+      line-height: 1.5;
+    }
+
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 13px;
+      z-index: 1000;
+      animation: slideIn 0.3s ease;
+    }
+
+    .toast.success { background: var(--success); color: white; }
+    .toast.error { background: var(--danger); color: white; }
+
+    @keyframes slideIn {
+      from { transform: translateX(100px); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    /* --- Responsive --- */
+    @media (max-width: 768px) {
+      body { flex-direction: column; }
+      .sidebar { width: 100%; height: auto; max-height: 50vh; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h1>🧠 Knowledge Base</h1>
+    </div>
+
+    <div class="nav-tabs">
+      <div class="nav-tab active" data-tab="docs">Documents</div>
+      <div class="nav-tab" data-tab="settings">Settings</div>
+    </div>
+
+    <div class="sidebar-content">
+      <!-- Documents Panel -->
+      <div class="docs-panel active" id="docsPanel">
+        <ul class="doc-list" id="docList"></ul>
+        <p id="noDocsMsg" style="font-size: 13px; color: var(--text-dim); text-align: center; padding: 20px;">
+          No documents yet. Add one below.
+        </p>
+      </div>
+
+      <!-- Settings Panel -->
+      <div class="settings-panel" id="settingsPanel">
+        <div class="input-group">
+          <label>Anthropic API Key</label>
+          <input type="password" id="apiKeyInput" placeholder="sk-ant-...">
+        </div>
+        <button class="btn" id="saveApiKey" style="margin-top:8px">Save API Key</button>
+        <div id="apiKeyStatus" style="margin-top: 12px;"></div>
+      </div>
+    </div>
+
+    <!-- Add Document Section -->
+    <div class="add-doc-section" id="addDocSection">
+      <h3>Add Document</h3>
+
+      <div class="add-type-tabs">
+        <div class="add-type-tab active" data-type="url">URL</div>
+        <div class="add-type-tab" data-type="upload">Upload</div>
+        <div class="add-type-tab" data-type="paste">Paste</div>
+      </div>
+
+      <!-- URL Form -->
+      <div id="urlForm">
+        <div class="input-group">
+          <label>Document Name</label>
+          <input type="text" id="docName" placeholder="e.g. Event FAQ">
+        </div>
+        <div class="input-group">
+          <label>URL (Published Google Doc or any URL)</label>
+          <input type="text" id="docUrl" placeholder="https://docs.google.com/...">
+        </div>
+        <button class="btn" id="addUrlDoc">Add Document</button>
+      </div>
+
+      <!-- Upload Form -->
+      <div id="uploadForm" style="display:none">
+        <div class="input-group">
+          <label>Document Name (optional)</label>
+          <input type="text" id="uploadDocName" placeholder="Auto-detected from filename">
+        </div>
+        <div class="file-drop" id="fileDrop">
+          <p>📄 Drop file here or click to browse</p>
+          <p class="formats">PDF, DOCX, TXT, MD, CSV, JSON</p>
+        </div>
+        <input type="file" class="file-input" id="fileInput" accept=".pdf,.docx,.doc,.txt,.md,.csv,.json">
+        <button class="btn" id="uploadBtn" disabled>Upload Document</button>
+      </div>
+
+      <!-- Paste Form -->
+      <div id="pasteForm" style="display:none">
+        <div class="input-group">
+          <label>Document Name</label>
+          <input type="text" id="pasteDocName" placeholder="e.g. Company Policy">
+        </div>
+        <div class="input-group">
+          <label>Content</label>
+          <textarea id="pasteContent" placeholder="Paste your text content here..."></textarea>
+        </div>
+        <button class="btn" id="addPasteDoc">Add Document</button>
+      </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar" id="statusBar">
+      <span class="status-dot yellow"></span> Checking status...
+    </div>
+  </div>
+
+  <!-- Chat Area -->
+  <div class="chat-area">
+    <div class="chat-header">
+      <span id="chatHeaderText">Ask anything about your documents</span>
+      <button class="clear-chat" id="clearChat">Clear Chat</button>
+    </div>
+
+    <div class="chat-messages" id="chatMessages">
+      <div class="empty-state" id="emptyState">
+        <h2>Ask your Knowledge Base</h2>
+        <p>Add documents using the sidebar, then ask questions. Answers come directly from your docs — no hallucination.</p>
+      </div>
+    </div>
+
+    <div class="chat-input-area">
+      <div class="chat-input-wrapper">
+        <input type="text" class="chat-input" id="chatInput" placeholder="Ask a question about your documents..." autocomplete="off">
+        <button class="send-btn" id="sendBtn">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- State ---
+    let chatHistory = [];
+    let selectedFile = null;
+
+    // --- Tab Navigation ---
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const target = tab.dataset.tab;
+        document.getElementById('docsPanel').classList.toggle('active', target === 'docs');
+        document.getElementById('settingsPanel').classList.toggle('active', target === 'settings');
+        document.getElementById('addDocSection').style.display = target === 'docs' ? '' : 'none';
+      });
+    });
+
+    // --- Add Type Tabs ---
+    document.querySelectorAll('.add-type-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.add-type-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const type = tab.dataset.type;
+        document.getElementById('urlForm').style.display = type === 'url' ? '' : 'none';
+        document.getElementById('uploadForm').style.display = type === 'upload' ? '' : 'none';
+        document.getElementById('pasteForm').style.display = type === 'paste' ? '' : 'none';
+      });
+    });
+
+    // --- Toast ---
+    function showToast(message, type = 'success') {
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    }
+
+    // --- Load Documents ---
+    async function loadDocs() {
+      const res = await fetch('/api/docs');
+      const docs = await res.json();
+      const list = document.getElementById('docList');
+      const noMsg = document.getElementById('noDocsMsg');
+
+      list.innerHTML = '';
+      noMsg.style.display = docs.length === 0 ? '' : 'none';
+
+      docs.forEach(doc => {
+        const li = document.createElement('li');
+        li.className = 'doc-item';
+
+        const typeLabel = doc.type === 'upload' ? 'file' : doc.type === 'paste' ? 'paste' : 'url';
+        const meta = doc.fileName ? doc.fileName : (doc.url ? doc.url.substring(0, 40) + '...' : 'Pasted text');
+
+        li.innerHTML = `
+          <div class="doc-item-header">
+            <span class="doc-name">${doc.name}</span>
+            <span class="doc-type">${typeLabel}</span>
+          </div>
+          <div class="doc-meta">${meta}</div>
+          <div class="doc-actions">
+            ${doc.type === 'url' ? `<button onclick="refreshDoc('${doc.id}')">↻ Refresh</button>` : ''}
+            ${doc.type === 'upload' ? `<button onclick="reuploadDoc('${doc.id}')">↻ Update</button>` : ''}
+            <button class="delete" onclick="deleteDoc('${doc.id}')">✕ Remove</button>
+          </div>
+        `;
+        list.appendChild(li);
+      });
+
+      updateStatus();
+    }
+
+    // --- Add URL Doc ---
+    document.getElementById('addUrlDoc').addEventListener('click', async () => {
+      const name = document.getElementById('docName').value.trim();
+      const url = document.getElementById('docUrl').value.trim();
+      if (!name || !url) return showToast('Name and URL are required', 'error');
+
+      const res = await fetch('/api/docs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, url, type: 'url' })
+      });
+
+      if (res.ok) {
+        document.getElementById('docName').value = '';
+        document.getElementById('docUrl').value = '';
+        showToast(`Added "${name}"`);
+        loadDocs();
+      } else {
+        showToast('Failed to add document', 'error');
+      }
+    });
+
+    // --- File Upload ---
+    const fileDrop = document.getElementById('fileDrop');
+    const fileInput = document.getElementById('fileInput');
+    const uploadBtn = document.getElementById('uploadBtn');
+
+    fileDrop.addEventListener('click', () => fileInput.click());
+    fileDrop.addEventListener('dragover', (e) => { e.preventDefault(); fileDrop.classList.add('dragover'); });
+    fileDrop.addEventListener('dragleave', () => fileDrop.classList.remove('dragover'));
+    fileDrop.addEventListener('drop', (e) => {
+      e.preventDefault();
+      fileDrop.classList.remove('dragover');
+      if (e.dataTransfer.files.length > 0) {
+        selectedFile = e.dataTransfer.files[0];
+        fileDrop.querySelector('p').textContent = `📄 ${selectedFile.name}`;
+        uploadBtn.disabled = false;
+      }
+    });
+
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length > 0) {
+        selectedFile = fileInput.files[0];
+        fileDrop.querySelector('p').textContent = `📄 ${selectedFile.name}`;
+        uploadBtn.disabled = false;
+      }
+    });
+
+    uploadBtn.addEventListener('click', async () => {
+      if (!selectedFile) return;
+      uploadBtn.disabled = true;
+      uploadBtn.textContent = 'Uploading...';
+
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      const name = document.getElementById('uploadDocName').value.trim();
+      if (name) formData.append('name', name);
+
+      try {
+        const res = await fetch('/api/docs/upload', { method: 'POST', body: formData });
+        if (res.ok) {
+          const doc = await res.json();
+          showToast(`Uploaded "${doc.name}"`);
+          selectedFile = null;
+          fileInput.value = '';
+          fileDrop.querySelector('p').textContent = '📄 Drop file here or click to browse';
+          document.getElementById('uploadDocName').value = '';
+          loadDocs();
+        } else {
+          const err = await res.json();
+          showToast(err.error || 'Upload failed', 'error');
+        }
+      } catch (err) {
+        showToast('Upload failed', 'error');
+      }
+
+      uploadBtn.disabled = false;
+      uploadBtn.textContent = 'Upload Document';
+    });
+
+    // --- Add Paste Doc ---
+    document.getElementById('addPasteDoc').addEventListener('click', async () => {
+      const name = document.getElementById('pasteDocName').value.trim();
+      const content = document.getElementById('pasteContent').value.trim();
+      if (!name || !content) return showToast('Name and content are required', 'error');
+
+      const res = await fetch('/api/docs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, type: 'paste', content })
+      });
+
+      if (res.ok) {
+        document.getElementById('pasteDocName').value = '';
+        document.getElementById('pasteContent').value = '';
+        showToast(`Added "${name}"`);
+        loadDocs();
+      } else {
+        showToast('Failed to add document', 'error');
+      }
+    });
+
+    // --- Doc Actions ---
+    async function deleteDoc(id) {
+      if (!confirm('Remove this document from the knowledge base?')) return;
+      await fetch(`/api/docs/${id}`, { method: 'DELETE' });
+      showToast('Document removed');
+      loadDocs();
+    }
+
+    async function refreshDoc(id) {
+      const res = await fetch(`/api/docs/${id}/refresh`, { method: 'POST' });
+      if (res.ok) {
+        showToast('Document refreshed');
+      } else {
+        showToast('Refresh failed', 'error');
+      }
+    }
+
+    function reuploadDoc(id) {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.pdf,.docx,.doc,.txt,.md,.csv,.json';
+      input.onchange = async () => {
+        if (input.files.length === 0) return;
+        const formData = new FormData();
+        formData.append('file', input.files[0]);
+        const res = await fetch(`/api/docs/${id}/reupload`, { method: 'POST', body: formData });
+        if (res.ok) {
+          showToast('Document updated');
+          loadDocs();
+        } else {
+          showToast('Update failed', 'error');
+        }
+      };
+      input.click();
+    }
+
+    // --- Settings ---
+    document.getElementById('saveApiKey').addEventListener('click', async () => {
+      const apiKey = document.getElementById('apiKeyInput').value.trim();
+      if (!apiKey) return showToast('API key is required', 'error');
+
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey })
+      });
+
+      if (res.ok) {
+        showToast('API key saved');
+        document.getElementById('apiKeyInput').value = '';
+        updateStatus();
+      }
+    });
+
+    // --- Status ---
+    async function updateStatus() {
+      const statusBar = document.getElementById('statusBar');
+      try {
+        const [settingsRes, statsRes] = await Promise.all([
+          fetch('/api/settings'),
+          fetch('/api/stats')
+        ]);
+        const settings = await settingsRes.json();
+        const stats = await statsRes.json();
+
+        if (!settings.hasApiKey) {
+          statusBar.innerHTML = '<span class="status-dot red"></span> No API key — go to Settings';
+        } else if (stats.documentCount === 0) {
+          statusBar.innerHTML = '<span class="status-dot yellow"></span> Ready — add some documents';
+        } else {
+          const pct = Math.round((stats.estimatedTokens / stats.maxTokens) * 100);
+          statusBar.innerHTML = `<span class="status-dot green"></span> ${stats.documentCount} docs · ~${(stats.estimatedTokens/1000).toFixed(0)}K tokens (${pct}%)`;
+        }
+      } catch {
+        statusBar.innerHTML = '<span class="status-dot red"></span> Error checking status';
+      }
+    }
+
+    // --- Chat ---
+    const chatInput = document.getElementById('chatInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const chatMessages = document.getElementById('chatMessages');
+    const emptyState = document.getElementById('emptyState');
+
+    chatInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    sendBtn.addEventListener('click', sendMessage);
+
+    document.getElementById('clearChat').addEventListener('click', () => {
+      chatHistory = [];
+      chatMessages.innerHTML = '';
+      emptyState.style.display = '';
+      chatMessages.appendChild(emptyState);
+    });
+
+    async function sendMessage() {
+      const text = chatInput.value.trim();
+      if (!text) return;
+
+      emptyState.style.display = 'none';
+
+      // Add user message
+      chatHistory.push({ role: 'user', content: text });
+      appendMessage('user', text);
+      chatInput.value = '';
+      sendBtn.disabled = true;
+
+      // Create assistant message placeholder
+      const assistantBubble = appendMessage('assistant', '');
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: chatHistory })
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          assistantBubble.textContent = `Error: ${err.error}`;
+          sendBtn.disabled = false;
+          return;
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let fullResponse = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') continue;
+
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.text) {
+                  fullResponse += parsed.text;
+                  assistantBubble.textContent = fullResponse;
+                  chatMessages.scrollTop = chatMessages.scrollHeight;
+                }
+                if (parsed.error) {
+                  assistantBubble.textContent = `Error: ${parsed.error}`;
+                }
+              } catch {}
+            }
+          }
+        }
+
+        chatHistory.push({ role: 'assistant', content: fullResponse });
+      } catch (err) {
+        assistantBubble.textContent = `Error: ${err.message}`;
+      }
+
+      sendBtn.disabled = false;
+      chatInput.focus();
+    }
+
+    function appendMessage(role, text) {
+      const div = document.createElement('div');
+      div.className = `message ${role}`;
+
+      const label = document.createElement('div');
+      label.className = 'message-label';
+      label.textContent = role === 'user' ? 'You' : 'Knowledge Base';
+
+      const bubble = document.createElement('div');
+      bubble.className = 'message-bubble';
+      bubble.textContent = text;
+
+      div.appendChild(label);
+      div.appendChild(bubble);
+      chatMessages.appendChild(div);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+
+      return bubble;
+    }
+
+    // --- Init ---
+    loadDocs();
+  </script>
+</body>
+</html>
