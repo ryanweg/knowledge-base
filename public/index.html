@@ -528,11 +528,16 @@
           <input type="text" id="uploadDocName" placeholder="Auto-detected from filename">
         </div>
         <div class="file-drop" id="fileDrop">
-          <p>📄 Drop file here or click to browse</p>
+          <p>Drop file here or click to browse</p>
           <p class="formats">PDF, DOCX, TXT, MD, CSV, JSON</p>
         </div>
         <input type="file" class="file-input" id="fileInput" accept=".pdf,.docx,.doc,.txt,.md,.csv,.json">
+        <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px; font-size:13px; cursor:pointer; color:var(--text-dim);">
+          <input type="checkbox" id="smartUploadToggle" checked style="accent-color:var(--accent); width:16px; height:16px;">
+          Smart merge (deduplicate against existing docs)
+        </label>
         <button class="btn" id="uploadBtn" disabled>Upload Document</button>
+        <div id="smartUploadResult" style="display:none; margin-top:12px; padding:12px; background:var(--surface2); border-radius:8px; border:1px solid var(--border); font-size:12px; line-height:1.6;"></div>
       </div>
 
       <!-- Paste Form -->
@@ -630,7 +635,9 @@
         li.className = 'doc-item';
 
         const typeLabel = doc.type === 'upload' ? 'file' : doc.type === 'paste' ? 'paste' : 'url';
-        const meta = doc.fileName ? doc.fileName : (doc.url ? doc.url.substring(0, 40) + '...' : 'Pasted text');
+        let meta = doc.fileName ? doc.fileName : (doc.url ? doc.url.substring(0, 40) + '...' : 'Pasted text');
+        if (doc.lastMergedFrom) meta += ` | Last merged: ${doc.lastMergedFrom}`;
+        if (doc.updatedAt) meta += ` | Updated: ${new Date(doc.updatedAt).toLocaleDateString()}`;
 
         li.innerHTML = `
           <div class="doc-item-header">
@@ -700,22 +707,49 @@
 
     uploadBtn.addEventListener('click', async () => {
       if (!selectedFile) return;
+      const isSmart = document.getElementById('smartUploadToggle').checked;
+      const resultDiv = document.getElementById('smartUploadResult');
+      resultDiv.style.display = 'none';
+
       uploadBtn.disabled = true;
-      uploadBtn.textContent = 'Uploading...';
+      uploadBtn.textContent = isSmart ? 'Analyzing & merging...' : 'Uploading...';
 
       const formData = new FormData();
       formData.append('file', selectedFile);
       const name = document.getElementById('uploadDocName').value.trim();
       if (name) formData.append('name', name);
 
+      const endpoint = isSmart ? '/api/docs/upload-smart' : '/api/docs/upload';
+
       try {
-        const res = await fetch('/api/docs/upload', { method: 'POST', body: formData });
+        const res = await fetch(endpoint, { method: 'POST', body: formData });
         if (res.ok) {
-          const doc = await res.json();
-          showToast(`Uploaded "${doc.name}"`);
+          const data = await res.json();
+
+          if (isSmart && data.summary) {
+            // Show merge results
+            let html = `<strong style="color:var(--success);">Merge complete</strong><br><br>`;
+            html += `<span style="color:var(--text);">${data.summary}</span><br>`;
+            if (data.updates && data.updates.length > 0) {
+              html += `<br><strong>Updated docs:</strong><ul style="margin:4px 0 0 16px;">`;
+              data.updates.forEach(u => {
+                html += `<li><strong>${u.name}</strong> — ${u.changes}</li>`;
+              });
+              html += `</ul>`;
+            }
+            if (data.newDoc) {
+              html += `<br><strong>New doc added:</strong> ${data.newDoc.name}`;
+            }
+            resultDiv.innerHTML = html;
+            resultDiv.style.display = 'block';
+            showToast('Smart merge complete');
+          } else {
+            showToast(`Uploaded "${data.name || name}"`);
+          }
+
           selectedFile = null;
           fileInput.value = '';
-          fileDrop.querySelector('p').textContent = '📄 Drop file here or click to browse';
+          fileDrop.querySelector('p').textContent = 'Drop file here or click to browse';
           document.getElementById('uploadDocName').value = '';
           loadDocs();
         } else {

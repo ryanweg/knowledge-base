@@ -206,6 +206,68 @@ async function buildKnowledgeContext() {
   return sections.join('\n\n');
 }
 
+// --- Smart Dedup/Merge via Claude ---
+async function deduplicateAndMerge(newDocName, newDocText, existingDocs) {
+  const client = getAnthropicClient();
+
+  // Build existing docs context
+  const existingContext = existingDocs.map(doc => {
+    const text = doc.extractedText || doc.content || '[No content]';
+    return `=== EXISTING DOC [ID: ${doc.id}]: ${doc.name} ===\n${text}\n=== END ===`;
+  }).join('\n\n');
+
+  const prompt = `You are a knowledge base deduplication assistant. A new document is being uploaded. Compare it against all existing documents and produce a merge plan.
+
+RULES:
+1. Where the new document covers the SAME topic/question as an existing document, the NEW content wins — it replaces the old version.
+2. Unique content in existing documents that the new doc does NOT cover must be PRESERVED exactly as-is.
+3. Unique content in the new document that doesn't belong in any existing document should be flagged as "new_standalone" content.
+4. Match by MEANING, not exact wording. A Q&A about "venue selection" in the new doc replaces a section about "venue selection" in an existing doc even if worded differently.
+5. If the new document's content fits entirely within one or more existing documents (updates/replaces parts of them), there should be NO standalone content.
+
+EXISTING DOCUMENTS:
+${existingContext}
+
+NEW DOCUMENT: "${newDocName}"
+${newDocText}
+
+Respond with ONLY valid JSON (no markdown fences, no explanation) in this exact format:
+{
+  "updates": [
+    {
+      "doc_id": "the existing doc's ID",
+      "doc_name": "the existing doc's name",
+      "merged_text": "the COMPLETE updated text for this document with new content merged in and old overlapping content replaced",
+      "changes_summary": "brief description of what changed"
+    }
+  ],
+  "new_standalone": {
+    "has_content": true/false,
+    "text": "any content from the new doc that doesn't fit in ANY existing document (empty string if none)",
+    "suggested_name": "suggested name for the new standalone doc if needed"
+  },
+  "summary": "one-paragraph summary of all changes made"
+}`;
+
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 16000,
+    messages: [{ role: 'user', content: prompt }]
+  });
+
+  const responseText = response.content[0].text.trim();
+  try {
+    return JSON.parse(responseText);
+  } catch (e) {
+    // Try to extract JSON if wrapped in markdown fences
+    const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[1].trim());
+    }
+    throw new Error('Failed to parse dedup response from Claude');
+  }
+}
+
 // --- API Routes ---
 
 // Settings
@@ -229,6 +291,50 @@ app.get('/api/docs', (req, res) => {
     hasContent: !!(d.extractedText || d.content || d.url)
   }));
   res.json(docs);
+});
+
+// Preview what smart merge would do (dry run)
+app.post('/api/docs/upload-smart/preview', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file provided' });
+    const name = req.body.name || req.file.originalname;
+    const newText = await extractFileText(req.file.path, req.file.originalname);
+    const docs = getDocs().filter(d => d.extractedText || d.content);
+
+    // Clean up temp file
+    if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+
+    if (docs.length === 0) {
+      return res.json({ preview: `No existing docs to merge against. "${name}" will be added as-is.`, overlaps: [] });
+    }
+
+    const client = getAnthropicClient();
+    const existingContext = docs.map(d => {
+      const text = d.extractedText || d.content || '';
+      return `=== DOC: ${d.name} ===\n${text.substring(0, 2000)}${text.length > 2000 ? '\n[truncated]' : ''}\n=== END ===`;
+    }).join('\n\n');
+
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1024,
+      messages: [{
+        role: 'user',
+        content: `Compare this new document against existing docs and list overlapping topics. Be brief.
+
+EXISTING DOCS (may be truncated):
+${existingContext}
+
+NEW DOCUMENT: "${name}"
+${newText.substring(0, 3000)}${newText.length > 3000 ? '\n[truncated]' : ''}
+
+List: (1) which existing docs have overlapping content, (2) what topics overlap, (3) what's new. Format as a short bullet list.`
+      }]
+    });
+
+    res.json({ preview: response.content[0].text });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Add doc via URL or paste
@@ -289,6 +395,97 @@ app.post('/api/docs/upload', upload.single('file'), async (req, res) => {
       textLength: extractedText.length
     });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Smart upload with deduplication
+app.post('/api/docs/upload-smart', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file provided' });
+
+    const name = req.body.name || req.file.originalname;
+    const filePath = req.file.path;
+    const newText = await extractFileText(filePath, req.file.originalname);
+
+    const docs = getDocs();
+    const existingDocs = docs.filter(d => {
+      return d.extractedText || d.content;
+    });
+
+    if (existingDocs.length === 0) {
+      // No existing docs — just add normally
+      const doc = {
+        id: Date.now().toString(),
+        name,
+        type: 'upload',
+        fileName: req.file.originalname,
+        filePath: filePath,
+        extractedText: newText,
+        url: null,
+        content: null,
+        addedAt: new Date().toISOString()
+      };
+      docs.push(doc);
+      saveDocs(docs);
+      return res.json({
+        success: true,
+        action: 'added',
+        summary: `Added "${name}" as first document — no dedup needed.`,
+        updates: [],
+        newDoc: { name, textLength: newText.length }
+      });
+    }
+
+    // Run dedup via Claude
+    console.log(`🔍 Smart upload: deduplicating "${name}" against ${existingDocs.length} existing docs...`);
+    const result = await deduplicateAndMerge(name, newText, existingDocs);
+    console.log(`✅ Dedup complete: ${result.updates.length} docs updated`);
+
+    // Apply updates to existing docs
+    const updatedNames = [];
+    for (const update of result.updates) {
+      const docIndex = docs.findIndex(d => d.id === update.doc_id);
+      if (docIndex !== -1) {
+        docs[docIndex].extractedText = update.merged_text;
+        docs[docIndex].updatedAt = new Date().toISOString();
+        docs[docIndex].lastMergedFrom = name;
+        updatedNames.push({ name: update.doc_name, changes: update.changes_summary });
+      }
+    }
+
+    // Add standalone content if any
+    let newDoc = null;
+    if (result.new_standalone && result.new_standalone.has_content && result.new_standalone.text.trim()) {
+      const standaloneDoc = {
+        id: Date.now().toString(),
+        name: result.new_standalone.suggested_name || name,
+        type: 'upload',
+        fileName: req.file.originalname,
+        filePath: filePath,
+        extractedText: result.new_standalone.text,
+        url: null,
+        content: null,
+        addedAt: new Date().toISOString()
+      };
+      docs.push(standaloneDoc);
+      newDoc = { name: standaloneDoc.name, textLength: result.new_standalone.text.length };
+    } else {
+      // Clean up uploaded file since all content was merged into existing docs
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    }
+
+    saveDocs(docs);
+
+    res.json({
+      success: true,
+      action: newDoc ? 'merged_and_added' : 'merged',
+      summary: result.summary,
+      updates: updatedNames,
+      newDoc
+    });
+  } catch (err) {
+    console.error('Smart upload error:', err);
     res.status(500).json({ error: err.message });
   }
 });
