@@ -250,7 +250,7 @@ Respond with ONLY valid JSON (no markdown fences, no explanation) in this exact 
 }`;
 
   const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-5',
     max_tokens: 16000,
     messages: [{ role: 'user', content: prompt }]
   });
@@ -315,7 +315,7 @@ app.post('/api/docs/upload-smart/preview', upload.single('file'), async (req, re
     }).join('\n\n');
 
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-5',
       max_tokens: 1024,
       messages: [{
         role: 'user',
@@ -613,7 +613,7 @@ CRITICAL RULES:
     res.setHeader('Connection', 'keep-alive');
 
     const stream = await client.messages.stream({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-5',
       max_tokens: 2048,
       system: systemPrompt,
       messages: messages.map(m => ({
